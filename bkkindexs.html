@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<title>สิ่งแวดล้อมเขตฉัน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&family=Prompt:wght@500;600;700&display=swap">
+<style>
+/* Layout: one district picker on top -> hero result with 50-district strip -> four indicator cards (score bar vs. median, what you can do) -> sortable 50-district ranking -> method and limits. */
+:root{
+  --bg:#F1F6F6; --surface:#FFFFFF; --ink:#12292E; --muted:#51666A; --line:#D3DFE0;
+  --accent:#0B6E7A; --accent-soft:#DAEEF0; --on-accent:#FFFFFF;
+  --t1:#17795A; --t2:#5C8F2B; --t3:#C27A10; --t4:#B83F2E;
+  --t1s:#D9F0E6; --t2s:#E6F0D3; --t3s:#FBEACA; --t4s:#F7DBD5;
+  --f-display:"Prompt","Noto Sans Thai",system-ui,sans-serif;
+  --f-body:"Noto Sans Thai","Prompt",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C181B; --surface:#132226; --ink:#E5F0F1; --muted:#9BB1B4; --line:#25393D;
+  --accent:#5CC4D0; --accent-soft:#17383E; --on-accent:#08191C;
+  --t1:#4CC59A; --t2:#9BCB5A; --t3:#E9A53A; --t4:#EE7A66;
+  --t1s:#173A2E; --t2s:#2A3517; --t3s:#3F2F10; --t4s:#40201A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C181B; --surface:#132226; --ink:#E5F0F1; --muted:#9BB1B4; --line:#25393D;
+  --accent:#5CC4D0; --accent-soft:#17383E; --on-accent:#08191C;
+  --t1:#4CC59A; --t2:#9BCB5A; --t3:#E9A53A; --t4:#EE7A66;
+  --t1s:#173A2E; --t2s:#2A3517; --t3s:#3F2F10; --t4s:#40201A; color-scheme:dark}
+ 
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;
+  padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);line-height:1.3;margin:0;text-wrap:balance}
+p{margin:0}
+.num{font-family:var(--f-display);font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+ 
+/* intro */
+.intro{padding-top:36px;display:flex;flex-direction:column;gap:14px}
+.kicker{font-size:13px;letter-spacing:.04em;color:var(--muted)}
+h1{font-size:clamp(28px,5.4vw,46px);font-weight:700}
+h1 em{font-style:normal;color:var(--accent)}
+.lede{max-width:62ch;color:var(--muted);font-size:17px}
+.picker{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;margin-top:8px}
+.picker label{display:block;font-weight:700;font-size:14px;margin-bottom:4px}
+.picker select{font:inherit;font-size:18px;min-width:min(100%,280px);padding:10px 14px;border-radius:10px;border:2px solid var(--accent);background:var(--surface);color:var(--ink)}
+.sample{font-size:13px;color:var(--muted);padding-bottom:12px}
+ 
+/* hero */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;display:grid;grid-template-columns:1fr auto;gap:20px 32px}
+.hero h2{font-size:clamp(26px,4.4vw,38px)}
+.hero .sum{margin-top:8px;max-width:60ch}
+.hero .sw{margin-top:10px;font-size:15px;color:var(--muted)}
+.hero .sw b{color:var(--ink)}
+.bigscore{text-align:right;min-width:150px}
+.bigscore .v{font-size:clamp(52px,9vw,76px);font-weight:700;line-height:1;color:var(--accent)}
+.bigscore .of{font-size:14px;color:var(--muted)}
+.bigscore .rk{margin-top:6px;font-family:var(--f-display);font-weight:600}
+.strip{grid-column:1/-1}
+.strip-lab{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:6px;gap:8px}
+.cells{display:grid;grid-template-columns:repeat(50,1fr);gap:2px;align-items:end;height:34px}
+.cell{border-radius:2px;height:12px;background:var(--line)}
+.cell.t1{background:var(--t1)}.cell.t2{background:var(--t2)}.cell.t3{background:var(--t3)}.cell.t4{background:var(--t4)}
+.cell.me{height:34px;outline:2px solid var(--ink);outline-offset:1px}
+.cell{opacity:.55}.cell.me{opacity:1}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:baseline}
+ 
+/* cards */
+.sec-h{display:flex;flex-direction:column;gap:6px}
+.sec-h h2{font-size:clamp(22px,3.6vw,28px)}
+.sec-h p{color:var(--muted);max-width:68ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.card h3{font-size:22px}
+.measure{font-size:13.5px;color:var(--muted)}
+.score{font-size:34px;font-weight:700;line-height:1;text-align:right;white-space:nowrap}
+.score small{font-size:14px;font-weight:500;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;padding:3px 10px;border-radius:99px;color:var(--ink)}
+.pill::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;color:inherit}
+.p1{background:var(--t1s)}.p1::before{background:var(--t1)}
+.p2{background:var(--t2s)}.p2::before{background:var(--t2)}
+.p3{background:var(--t3s)}.p3::before{background:var(--t3)}
+.p4{background:var(--t4s)}.p4::before{background:var(--t4)}
+.bar{position:relative;height:14px;border-radius:7px;background:var(--line);margin:22px 0 4px}
+.bar .fill{position:absolute;inset:0 auto 0 0;border-radius:7px}
+.f1{background:var(--t1)}.f2{background:var(--t2)}.f3{background:var(--t3)}.f4{background:var(--t4)}
+.bar .med{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
+.bar .medl{position:absolute;top:-24px;transform:translateX(-50%);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.axis{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.meaning{font-weight:500}
+.role{display:flex;flex-direction:column;gap:6px;background:var(--accent-soft);border-radius:10px;padding:12px 14px}
+.role .tag{font-size:13px;font-weight:700;color:var(--accent)}
+.role ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px;font-size:15px}
+.note{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+ 
+/* cross-district message */
+.msg{background:var(--accent);color:var(--on-accent);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:10px}
+.msg h2{font-size:clamp(22px,3.6vw,30px)}
+.msg p{max-width:66ch}
+.msg ul{margin:4px 0 0;padding-left:20px}
+ 
+/* ranking */
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs button{font:inherit;font-size:15px;padding:6px 14px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:700}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-height:560px;overflow-y:auto;padding:6px}
+.row{display:grid;grid-template-columns:34px minmax(88px,1.1fr) 3fr 52px;gap:10px;align-items:center;width:100%;padding:6px 10px;border:0;background:none;color:inherit;font:inherit;font-size:15px;text-align:left;border-radius:8px;cursor:pointer}
+.row:hover{background:var(--bg)}
+.row.sel{background:var(--accent-soft);font-weight:700}
+.row .r{color:var(--muted);text-align:right}
+.row .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t{height:10px;border-radius:5px;background:var(--line);position:relative}
+.row .t i{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.row .s{text-align:right}
+.hint{font-size:13px;color:var(--muted)}
+ 
+/* method */
+.method{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.method section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.method h3{font-size:18px}
+.method ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.src{font-size:14px;color:var(--muted)}
+.src a{overflow-wrap:anywhere}
+ 
+@media (max-width:620px){
+  .hero{grid-template-columns:1fr;padding:18px}
+  .bigscore{text-align:left}
+  .row{grid-template-columns:28px minmax(70px,1fr) 1.4fr 44px;gap:8px;font-size:14px}
+  .score{font-size:30px}
+}
+@media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .5s ease}}
+</style>
+ 
+</head>
+<body>
+<div class="wrap">
+  <header class="intro">
+    <div class="kicker">Bangkok Index 2025 · ด้านสิ่งแวดล้อม · ข้อมูลจาก Rocket Media Lab</div>
+    <h1>สิ่งแวดล้อมเขตคุณ <em>มีรอยมือคุณ</em> อยู่ด้วย</h1>
+    <p class="lede">เลือกเขตที่คุณอยู่ เพื่อดูว่าคะแนนสิ่งแวดล้อมมาจากอะไร ตรงไหนเขตทำได้ดี ตรงไหนยังขาด และคนในเขตมีส่วนช่วยได้ตรงไหนบ้าง</p>
+    <div class="picker">
+      <div>
+        <label for="khet">เขตที่คุณอยู่</label>
+        <select id="khet"></select>
+      </div>
+      <div class="sample" id="sample">กำลังแสดงเขตตัวอย่าง เลือกเขตของคุณได้จากช่องนี้</div>
+    </div>
+  </header>
+ 
+  <main class="wrap" id="out" style="gap:28px"></main>
+ 
+  <section class="wrap" aria-labelledby="rk-h" style="gap:14px">
+    <div class="sec-h">
+      <h2 id="rk-h">เทียบทั้ง 50 เขต</h2>
+      <p>เลือกตัวชี้วัดเพื่อเรียงอันดับ กดที่ชื่อเขตเพื่อดูรายละเอียดของเขตนั้น</p>
+    </div>
+    <div class="tabs" role="tablist" id="tabs" aria-label="เรียงตามตัวชี้วัด"></div>
+    <div class="list" id="list" tabindex="0" aria-label="อันดับ 50 เขต"></div>
+    <p class="hint" id="rk-hint"></p>
+  </section>
+ 
+  <section class="wrap" aria-labelledby="m-h" style="gap:14px">
+    <div class="sec-h">
+      <h2 id="m-h">คะแนนนี้อ่านอย่างไร และอ่านอย่างระวังตรงไหน</h2>
+    </div>
+    <div class="method" id="method"></div>
+    <p class="src">ที่มา: ตารางคะแนนด้านสิ่งแวดล้อมจากไฟล์ Bangkok Index 2025 ของ Rocket Media Lab ·
+      <a href="https://rocketmedialab.co/bangkok-index-2025/" target="_blank" rel="noopener">รายงานภาพรวม</a> ·
+      <a href="https://rocketmedialab.co/wastewater-bangkok-index-2025/" target="_blank" rel="noopener">บทความน้ำเสีย</a> ·
+      <a href="https://rocketmedialab.co/database-bangkok-index-2025/" target="_blank" rel="noopener">ข้อมูลดิบ</a>.
+      หน้านี้ใช้เฉพาะคะแนนในตาราง ไม่ได้นำตัวเลขจากแหล่งอื่นมาเพิ่ม ข้อเสนอ "ทำได้เลย" เป็นคำแนะนำทั่วไป ไม่ได้คำนวณจากข้อมูล
+      (ชื่อเขตราษฎร์บูรณะแก้การสะกดจากไฟล์ต้นฉบับ)</p>
+  </section>
+</div>
+ 
+<script>
+const D = [{"n": "หนองจอก", "rk": 11, "s": 33.2952, "wr": 1, "ws": 50.0, "qr": 9, "qs": 44.7885, "ar": 36, "as_": 33.0155, "pr": 20, "ps": 5.3767}, {"n": "สายไหม", "rk": 10, "s": 33.3289, "wr": 2, "ws": 48.6184, "qr": 15, "qs": 41.3676, "ar": 17, "as_": 39.8032, "pr": 33, "ps": 3.5264}, {"n": "คลองสามวา", "rk": 7, "s": 34.0066, "wr": 3, "ws": 48.132, "qr": 4, "qs": 46.6053, "ar": 27, "as_": 37.2373, "pr": 25, "ps": 4.0517}, {"n": "ดอนเมือง", "rk": 17, "s": 31.1647, "wr": 4, "ws": 48.0618, "qr": 32, "qs": 29.7285, "ar": 13, "as_": 42.2355, "pr": 22, "ps": 4.6329}, {"n": "หนองแขม", "rk": 18, "s": 31.127, "wr": 5, "ws": 48.0013, "qr": 18, "qs": 37.902, "ar": 35, "as_": 35.4866, "pr": 36, "ps": 3.118}, {"n": "ทุ่งครุ", "rk": 36, "s": 26.4086, "wr": 6, "ws": 47.8401, "qr": 35, "qs": 26.8063, "ar": 42, "as_": 27.2142, "pr": 31, "ps": 3.7739}, {"n": "จอมทอง", "rk": 2, "s": 35.3582, "wr": 7, "ws": 47.0494, "qr": 8, "qs": 44.9974, "ar": 4, "as_": 47.2203, "pr": 42, "ps": 2.1656}, {"n": "บางกอกใหญ่", "rk": 5, "s": 34.6231, "wr": 8, "ws": 47.0146, "qr": 6, "qs": 45.8293, "ar": 29, "as_": 36.3103, "pr": 11, "ps": 9.338}, {"n": "ภาษีเจริญ", "rk": 8, "s": 33.5534, "wr": 9, "ws": 46.6878, "qr": 3, "qs": 46.9992, "ar": 22, "as_": 38.6138, "pr": 47, "ps": 1.9127}, {"n": "บางซื่อ", "rk": 19, "s": 31.0901, "wr": 10, "ws": 46.6433, "qr": 21, "qs": 36.8911, "ar": 20, "as_": 38.7207, "pr": 45, "ps": 2.1051}, {"n": "มีนบุรี", "rk": 9, "s": 33.4797, "wr": 11, "ws": 46.3923, "qr": 11, "qs": 43.3239, "ar": 23, "as_": 38.0926, "pr": 18, "ps": 6.1099}, {"n": "ราษฎร์บูรณะ", "rk": 14, "s": 32.0119, "wr": 12, "ws": 46.2918, "qr": 12, "qs": 42.451, "ar": 30, "as_": 36.1791, "pr": 35, "ps": 3.1257}, {"n": "บึงกุ่ม", "rk": 34, "s": 27.1614, "wr": 13, "ws": 45.9579, "qr": 39, "qs": 19.0369, "ar": 32, "as_": 35.8341, "pr": 15, "ps": 7.8165}, {"n": "สะพานสูง", "rk": 3, "s": 34.7747, "wr": 14, "ws": 45.8094, "qr": 14, "qs": 41.3941, "ar": 2, "as_": 48.53, "pr": 34, "ps": 3.3654}, {"n": "ธนบุรี", "rk": 13, "s": 32.7996, "wr": 15, "ws": 45.501, "qr": 5, "qs": 46.2136, "ar": 26, "as_": 37.3977, "pr": 46, "ps": 2.086}, {"n": "บางแค", "rk": 33, "s": 27.5861, "wr": 16, "ws": 45.3258, "qr": 24, "qs": 34.3954, "ar": 40, "as_": 28.4705, "pr": 43, "ps": 2.1525}, {"n": "บางเขน", "rk": 43, "s": 22.4935, "wr": 17, "ws": 45.3136, "qr": 50, "qs": 1.0, "ar": 16, "as_": 39.8433, "pr": 30, "ps": 3.8169}, {"n": "คันนายาว", "rk": 6, "s": 34.2285, "wr": 18, "ws": 45.1044, "qr": 29, "qs": 31.4016, "ar": 14, "as_": 41.6475, "pr": 5, "ps": 18.7603}, {"n": "ตลิ่งชัน", "rk": 20, "s": 30.6352, "wr": 19, "ws": 44.9399, "qr": 2, "qs": 48.2541, "ar": 45, "as_": 21.5211, "pr": 14, "ps": 7.8256}, {"n": "บางพลัด", "rk": 28, "s": 29.0184, "wr": 20, "ws": 44.6584, "qr": 27, "qs": 32.5101, "ar": 28, "as_": 36.3419, "pr": 40, "ps": 2.5631}, {"n": "หลักสี่", "rk": 16, "s": 31.5421, "wr": 21, "ws": 44.1485, "qr": 34, "qs": 28.3296, "ar": 7, "as_": 43.3714, "pr": 10, "ps": 10.3189}, {"n": "ทวีวัฒนา", "rk": 1, "s": 37.3991, "wr": 22, "ws": 44.1191, "qr": 1, "qs": 50.0, "ar": 25, "as_": 37.7099, "pr": 7, "ps": 17.7673}, {"n": "บางคอแหลม", "rk": 29, "s": 28.7357, "wr": 23, "ws": 44.0117, "qr": 26, "qs": 32.6187, "ar": 48, "as_": 11.5382, "pr": 2, "ps": 26.7743}, {"n": "พระโขนง", "rk": 37, "s": 25.5459, "wr": 24, "ws": 43.9102, "qr": 45, "qs": 10.0763, "ar": 6, "as_": 46.087, "pr": 44, "ps": 2.1101}, {"n": "ประเวศ", "rk": 32, "s": 27.5936, "wr": 25, "ws": 43.7152, "qr": 36, "qs": 26.6384, "ar": 47, "as_": 16.4428, "pr": 3, "ps": 23.5779}, {"n": "ลาดกระบัง", "rk": 27, "s": 29.0193, "wr": 26, "ws": 43.3646, "qr": 20, "qs": 37.1656, "ar": 38, "as_": 31.5442, "pr": 26, "ps": 4.0028}, {"n": "บางขุนเทียน", "rk": 12, "s": 32.962, "wr": 27, "ws": 43.2909, "qr": 10, "qs": 44.7587, "ar": 18, "as_": 38.9746, "pr": 21, "ps": 4.8239}, {"n": "ลาดพร้าว", "rk": 38, "s": 25.1708, "wr": 28, "ws": 43.2149, "qr": 37, "qs": 25.2519, "ar": 41, "as_": 28.27, "pr": 27, "ps": 3.9462}, {"n": "ดุสิต", "rk": 30, "s": 28.6412, "wr": 29, "ws": 42.9193, "qr": 23, "qs": 36.0685, "ar": 43, "as_": 26.7331, "pr": 12, "ps": 8.8439}, {"n": "ป้อมปราบศัตรูพ่าย", "rk": 45, "s": 21.1338, "wr": 30, "ws": 42.1591, "qr": 19, "qs": 37.4674, "ar": 50, "as_": 1.0, "pr": 29, "ps": 3.9088}, {"n": "คลองสาน", "rk": 26, "s": 29.5454, "wr": 31, "ws": 41.9858, "qr": 31, "qs": 30.3424, "ar": 12, "as_": 42.2622, "pr": 32, "ps": 3.591}, {"n": "สวนหลวง", "rk": 49, "s": 19.3007, "wr": 32, "ws": 41.276, "qr": 38, "qs": 24.7998, "ar": 49, "as_": 5.5778, "pr": 19, "ps": 5.549}, {"n": "บางบอน", "rk": 31, "s": 28.3626, "wr": 33, "ws": 40.9399, "qr": 13, "qs": 41.6698, "ar": 44, "as_": 23.2318, "pr": 16, "ps": 7.609}, {"n": "สาทร", "rk": 41, "s": 23.2853, "wr": 34, "ws": 39.9741, "qr": 46, "qs": 8.0954, "ar": 21, "as_": 38.6405, "pr": 17, "ps": 6.4313}, {"n": "วังทองหลาง", "rk": 42, "s": 22.812, "wr": 35, "ws": 39.6295, "qr": 42, "qs": 14.7479, "ar": 33, "as_": 35.6203, "pr": 50, "ps": 1.2502}, {"n": "ยานนาวา", "rk": 21, "s": 30.5704, "wr": 36, "ws": 39.3093, "qr": 28, "qs": 31.4694, "ar": 5, "as_": 47.1535, "pr": 23, "ps": 4.3493}, {"n": "ดินแดง", "rk": 44, "s": 21.2567, "wr": 37, "ws": 39.1728, "qr": 49, "qs": 1.0485, "ar": 8, "as_": 43.1187, "pr": 48, "ps": 1.6869}, {"n": "บางนา", "rk": 40, "s": 23.657, "wr": 38, "ws": 39.1169, "qr": 40, "qs": 16.4386, "ar": 31, "as_": 36.1281, "pr": 37, "ps": 2.9442}, {"n": "จตุจักร", "rk": 24, "s": 30.0557, "wr": 39, "ws": 38.4447, "qr": 30, "qs": 31.2595, "ar": 37, "as_": 32.3728, "pr": 6, "ps": 18.1456}, {"n": "พญาไท", "rk": 25, "s": 29.8727, "wr": 40, "ws": 38.1178, "qr": 17, "qs": 38.1221, "ar": 15, "as_": 40.6719, "pr": 39, "ps": 2.5789}, {"n": "บางกะปิ", "rk": 22, "s": 30.4576, "wr": 41, "ws": 37.8804, "qr": 25, "qs": 33.1559, "ar": 3, "as_": 48.0756, "pr": 38, "ps": 2.7183}, {"n": "สัมพันธวงศ์", "rk": 23, "s": 30.1806, "wr": 42, "ws": 37.2202, "qr": 22, "qs": 36.2643, "ar": 9, "as_": 42.917, "pr": 24, "ps": 4.321}, {"n": "ห้วยขวาง", "rk": 46, "s": 20.3023, "wr": 43, "ws": 34.2429, "qr": 43, "qs": 14.3636, "ar": 39, "as_": 28.6855, "pr": 28, "ps": 3.917}, {"n": "บางกอกน้อย", "rk": 4, "s": 34.7718, "wr": 44, "ws": 31.4894, "qr": 7, "qs": 45.5756, "ar": 19, "as_": 38.7474, "pr": 4, "ps": 23.2748}, {"n": "ราชเทวี", "rk": 39, "s": 24.4146, "wr": 45, "ws": 31.1592, "qr": 41, "qs": 15.5489, "ar": 11, "as_": 42.6872, "pr": 13, "ps": 8.2629}, {"n": "คลองเตย", "rk": 50, "s": 17.2428, "wr": 46, "ws": 30.4559, "qr": 47, "qs": 8.032, "ar": 46, "as_": 18.2069, "pr": 9, "ps": 12.2765}, {"n": "บางรัก", "rk": 48, "s": 19.5288, "wr": 47, "ws": 28.1228, "qr": 44, "qs": 11.9117, "ar": 34, "as_": 35.6069, "pr": 41, "ps": 2.4737}, {"n": "วัฒนา", "rk": 35, "s": 26.8346, "wr": 48, "ws": 26.9557, "qr": 33, "qs": 29.029, "ar": 1, "as_": 50.0, "pr": 49, "ps": 1.3536}, {"n": "พระนคร", "rk": 15, "s": 31.6031, "wr": 49, "ws": 26.2291, "qr": 16, "qs": 39.765, "ar": 10, "as_": 42.6898, "pr": 8, "ps": 17.7286}, {"n": "ปทุมวัน", "rk": 47, "s": 20.1926, "wr": 50, "ws": 1.0, "qr": 48, "qs": 3.4882, "ar": 24, "as_": 37.9189, "pr": 1, "ps": 38.3632}];
+const N = D.length;
+const median = a => { const s=[...a].sort((x,y)=>x-y); const m=s.length>>1; return s.length%2? s[m] : (s[m-1]+s[m])/2; };
+const f1 = x => x.toFixed(1);
+ 
+const IND = [
+ { id:'w', name:'ขยะ', r:'wr', s:'ws',
+   measure:'วัดจาก: ขยะที่เกิดต่อประชากร 1 คน (ปี 2568) · ยิ่งน้อย คะแนนยิ่งสูง',
+   role:'เรามีส่วนโดยตรง',
+   acts:['แยกเศษอาหารออกจากขยะอื่นก่อนทิ้ง','พกถุง แก้ว กล่อง ลดของใช้ครั้งเดียว','ซื้อเท่าที่ใช้ ลดอาหารเหลือทิ้ง'],
+   caveat:'ตัวหารคือจำนวนประชากรในเขต ถ้ามีคนเข้ามาทำงานหรือท่องเที่ยวมาก ตัวเลขต่อหัวอาจสูงกว่าที่คนในเขตสร้างเอง' },
+ { id:'q', name:'น้ำเสีย', r:'qr', s:'qs',
+   measure:'วัดจาก: ค่า BOD ของคลองและแม่น้ำ (ยิ่งต่ำ น้ำยิ่งสะอาด) · เฉลี่ยปี 2540–2567',
+   role:'มีส่วนผ่านสิ่งที่เราเทลงท่อ',
+   acts:['ไม่เทน้ำมันทอดเก่าและเศษอาหารลงท่อ','ร้านอาหารและบ้านติดตั้งที่ดักไขมัน','ไม่ทิ้งขยะลงคลอง แจ้งจุดที่มีขยะลอยผ่านแอป Traffy Fondue'],
+   caveat:'เป็นค่าคุณภาพคลองเฉลี่ยกว่า 28 ปี ไม่ใช่สภาพปัจจุบัน และคลองไหลผ่านหลายเขต น้ำในเขตหนึ่งจึงได้รับผลจากเขตอื่นด้วย' },
+ { id:'a', name:'อากาศ', r:'ar', s:'as_',
+   measure:'วัดจาก: ค่าฝุ่น PM2.5 (ยิ่งต่ำ คะแนนยิ่งสูง)',
+   role:'มีส่วนร่วมบางส่วน',
+   acts:['ไม่เผาขยะและใบไม้','ดับเครื่องเมื่อจอดรถนาน ตรวจสภาพรถ','เลือกรถสาธารณะหรือเดินทางร่วมกันเมื่อทำได้'],
+   caveat:'ฝุ่นมาจากหลายแหล่งและลอยข้ามเขตได้ บทความต้นฉบับไม่ได้ระบุช่วงเวลาของข้อมูล PM2.5' },
+ { id:'p', name:'สวนสาธารณะ', r:'pr', s:'ps',
+   measure:'วัดจาก: พื้นที่สีเขียวต่อประชากร และพื้นที่สวนที่เข้าถึงได้ต่อประชากร (ปี 2568)',
+   role:'ใช้และเรียกร้องร่วมกัน',
+   acts:['ใช้สวนใกล้บ้าน และช่วยกันรักษาความสะอาด','แจ้งปัญหาสวนชำรุดผ่าน Traffy Fondue','เสนอพื้นที่สีเขียวเล็กๆ กับสำนักงานเขตและสภาเขต'],
+   caveat:'นับเฉพาะสวนที่สำนักงานสวนดูแล ไม่รวมสวนเอกชนหรือพื้นที่สีเขียวอื่น' }
+];
+const TOTAL = { id:'t', name:'คะแนนรวม', r:'rk', s:'s' };
+ 
+const med = {}; [TOTAL,...IND].forEach(i => med[i.id] = median(D.map(d=>d[i.s])));
+const smax = Math.max(...D.map(d=>d.s)), smin = Math.min(...D.map(d=>d.s));
+const parkLow = D.filter(d=>d.ps<5).length;
+const tier = r => r<=10?1 : r<=25?2 : r<=40?3 : 4;
+const tierTxt = ['', 'อยู่ใน 10 เขตที่ดีที่สุด', 'อยู่ครึ่งบนของ 50 เขต', 'อยู่ครึ่งล่างของ 50 เขต', 'อยู่ใน 10 เขตท้ายสุด'];
+const tierShort = ['', '10 อันดับแรก', 'ครึ่งบน', 'ครึ่งล่าง', '10 อันดับท้าย'];
+ 
+// cross-district facts, computed from the table
+const keys = IND.map(i=>i.r);
+const anyTop = D.filter(d=>keys.some(k=>d[k]<=10)).length;
+const topAndBottom = D.filter(d=>keys.some(k=>d[k]<=10) && keys.some(k=>d[k]>=41)).length;
+const allTop = D.filter(d=>keys.every(k=>d[k]<=10)).length;
+ 
+const sel = document.getElementById('khet');
+[...D].sort((a,b)=>a.n.localeCompare(b.n,'th')).forEach(d => {
+  const o = document.createElement('option'); o.value = d.n; o.textContent = 'เขต' + d.n; sel.appendChild(o);
+});
+let cur = 'จตุจักร', isSample = true, tab = 't';
+try { const s = localStorage.getItem('khet'); if (s && D.some(d=>d.n===s)) { cur = s; isSample = false; } } catch(e){}
+sel.value = cur;
+ 
+function bar(i, d){
+  const v = d[i.s], t = tier(d[i.r]);
+  return `<div class="bar" role="img" aria-label="${i.name} ${f1(v)} จาก 50 ค่ากลาง ${f1(med[i.id])}">
+    <div class="fill f${t}" style="width:${v/50*100}%"></div>
+    <div class="med" style="left:${med[i.id]/50*100}%"></div>
+    <div class="medl" style="left:${Math.min(Math.max(med[i.id]/50*100,12),88)}%">ค่ากลางของ 50 เขต ${f1(med[i.id])}</div></div>
+    <div class="axis"><span>0</span><span>25</span><span>50</span></div>`;
+}
+ 
+function render(){
+  const d = D.find(x=>x.n===cur);
+  const t = tier(d.rk);
+  const ranked = IND.map(i=>({i, r:d[i.r]})).sort((a,b)=>a.r-b.r);
+  const best = ranked[0], worst = ranked[ranked.length-1];
+  const cells = [...D].sort((a,b)=>a.rk-b.rk).map(x=>`<div class="cell t${tier(x.rk)}${x.n===cur?' me':''}" title="อันดับ ${x.rk} เขต${x.n}"></div>`).join('');
+ 
+  const cards = IND.map(i => {
+    const r = d[i.r], tt = tier(r);
+    let extra = i.caveat;
+    if (i.id==='p') extra += ` ในตารางนี้ ${parkLow} จาก ${N} เขตได้คะแนนสวนต่ำกว่า 5`;
+    if (i.id==='w' && r>=40) extra += ' (ข้อนี้อาจใช้กับเขตของคุณ)';
+    return `<article class="card">
+      <div class="card-top">
+        <div><h3>${i.name}</h3><div class="measure">${i.measure}</div></div>
+        <div class="score num">${f1(d[i.s])}<small> /50</small></div>
+      </div>
+      <div><span class="pill p${tt}">อันดับ ${r} จาก ${N} · ${tierShort[tt]}</span></div>
+      ${bar(i,d)}
+      <p class="meaning">เขต${d.n}${tierTxt[tt]}ในเรื่อง${i.name}</p>
+      <div class="role"><div class="tag">${i.role}</div>
+        <ul>${i.acts.map(a=>`<li>${a}</li>`).join('')}</ul></div>
+      <p class="note">ข้อจำกัดของตัวเลขนี้: ${extra}</p>
+    </article>`;
+  }).join('');
+ 
+  document.getElementById('out').innerHTML = `
+    <section class="hero" aria-live="polite">
+      <div>
+        <h2>เขต${d.n}</h2>
+        <p class="sum">คะแนนด้านสิ่งแวดล้อมของเขตนี้${tierTxt[t]} เมื่อเทียบกับค่ากลางของทั้งกรุงเทพฯ ${d.s>=med.t?'สูงกว่า':'ต่ำกว่า'}อยู่ ${f1(Math.abs(d.s-med.t))} คะแนน</p>
+        <p class="sw">${best.r===worst.r ? '' : `ทำได้ดีที่สุด: <b>${best.i.name}</b> (อันดับ ${best.r}) · ดึงคะแนนลงมากที่สุด: <b>${worst.i.name}</b> (อันดับ ${worst.r})`}</p>
+        <p class="sw">ค่ากลางของ 50 เขตคือ ${f1(med.t)} คะแนนสูงสุดคือ ${f1(smax)} ต่ำสุดคือ ${f1(smin)} จากเต็ม 50 ยังไม่มีเขตไหนเข้าใกล้เต็ม</p>
+      </div>
+      <div class="bigscore"><div class="v num">${f1(d.s)}</div><div class="of">คะแนนสิ่งแวดล้อม จากเต็ม 50</div><div class="rk">อันดับ ${d.rk} / ${N}</div></div>
+      <div class="strip">
+        <div class="strip-lab"><span>อันดับ 1</span><span>เขตทั้ง 50 เรียงตามคะแนนสิ่งแวดล้อม (ช่องสูงคือเขต${d.n})</span><span>อันดับ 50</span></div>
+        <div class="cells" aria-hidden="true">${cells}</div>
+        <div class="legend"><span><i style="background:var(--t1)"></i>10 อันดับแรก</span><span><i style="background:var(--t2)"></i>อันดับ 11–25</span><span><i style="background:var(--t3)"></i>อันดับ 26–40</span><span><i style="background:var(--t4)"></i>10 อันดับท้าย</span></div>
+      </div>
+    </section>
+ 
+    <div class="sec-h"><h2>4 เรื่องที่ประกอบเป็นคะแนนของเขต${d.n}</h2>
+      <p>คะแนนสิ่งแวดล้อมคือค่าเฉลี่ยของ 4 ตัวชี้วัดนี้ น้ำหนักเท่ากัน เส้นดำบนแถบคือค่ากลางของทั้ง 50 เขต</p></div>
+    <div class="cards">${cards}</div>
+ 
+    <section class="msg">
+      <h2>ไม่มีเขตไหนทำได้ครบ และไม่มีเขตไหนไม่มีส่วนช่วย</h2>
+      <p>ในตารางนี้ ${allTop===0?'ไม่มีเขตไหนอยู่ 10 อันดับแรกครบทั้ง 4 เรื่อง':`มี ${allTop} เขตที่อยู่ 10 อันดับแรกครบทั้ง 4 เรื่อง`}
+        มี ${anyTop} เขตที่เป็น 10 อันดับแรกอย่างน้อย 1 เรื่อง และ ${topAndBottom} เขตในกลุ่มนั้นเป็น 10 อันดับท้ายในอีกเรื่องหนึ่งด้วย</p>
+      <p>เขต${d.n}ทำได้ดีที่สุดเรื่อง${best.i.name}${best.r===worst.r?'':` และยังมีที่ว่างให้ขยับเรื่อง${worst.i.name}`}
+        คะแนนนี้ไม่ได้บอกว่าคนในเขตเป็นต้นเหตุทั้งหมด หลายเรื่องมาจากระบบของเมืองและเขตข้างเคียง แต่ขยะที่เราทิ้ง สิ่งที่เทลงท่อ ควันที่เราสร้าง และสวนที่เราใช้หรือเรียกร้อง เป็นส่วนที่คนในเขตมีเสียงและมีมือ</p>
+    </section>`;
+  document.getElementById('sample').hidden = !isSample;
+  renderList();
+}
+ 
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  el.innerHTML = [TOTAL,...IND].map(i=>`<button role="tab" data-id="${i.id}" aria-selected="${i.id===tab}">${i.id==='t'?'คะแนนรวม':i.name}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ tab=b.dataset.id; renderTabs(); renderList(true); });
+}
+function renderList(scrollToSel){
+  const i = [TOTAL,...IND].find(x=>x.id===tab);
+  const rows = [...D].sort((a,b)=>a[i.r]-b[i.r]||b[i.s]-a[i.s]);
+  const list = document.getElementById('list');
+  const keep = list.scrollTop;
+  list.innerHTML = rows.map(d=>`<button class="row${d.n===cur?' sel':''}" data-n="${d.n}" ${d.n===cur?'aria-current="true"':''}>
+    <span class="r num">${d[i.r]}</span><span class="n">${d.n}</span>
+    <span class="t"><i class="f${tier(d[i.r])}" style="width:${d[i.s]/50*100}%"></i></span>
+    <span class="s num">${f1(d[i.s])}</span></button>`).join('');
+  list.querySelectorAll('.row').forEach(b=>b.onclick=()=>choose(b.dataset.n, true));
+  const s = list.querySelector('.row.sel');
+  if (scrollToSel && s) list.scrollTop = Math.max(0, s.offsetTop - list.clientHeight/2 + s.clientHeight/2); else list.scrollTop = keep;
+  document.getElementById('rk-hint').textContent = i.id==='p'
+    ? `คะแนนสวนสาธารณะไม่ได้ขึ้นถึง 50 ในตารางนี้ (สูงสุด ${f1(Math.max(...D.map(d=>d.ps)))}) แถบจึงสั้นกว่าตัวอื่นแม้เป็นอันดับ 1`
+    : 'แถบยาวเต็มคือ 50 คะแนน สีของแถบตามช่วงอันดับ เหมือนในการ์ดด้านบน';
+}
+function choose(n, fromList){
+  cur = n; isSample = false; sel.value = n;
+  try { localStorage.setItem('khet', n); } catch(e){}
+  render();
+  if (fromList) document.querySelector('.intro').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+}
+sel.onchange = () => choose(sel.value, false);
+ 
+document.getElementById('method').innerHTML = `
+ <section><h3>คะแนนมาจากไหน</h3><ul>
+  <li>Bangkok Index มี 4 ด้าน ด้านละ 4 ตัวชี้วัด สิ่งแวดล้อมคือ 1 ใน 4 ด้านนั้น จึงมีน้ำหนัก 25% ของคะแนนรวม</li>
+  <li>ตัวชี้วัดสิ่งแวดล้อมคือ ขยะ น้ำเสีย อากาศ สวนสาธารณะ ค่าเฉลี่ยของ 4 ตัวนี้คือคะแนนสิ่งแวดล้อม (ตรวจแล้วตรงกับตารางทุกเขต)</li>
+  <li>ขยะ น้ำเสีย อากาศ ถูกปรับให้อยู่ในช่วง 1–50 เขตที่ดีที่สุดได้ 50 เขตที่แย่ที่สุดได้ 1 ส่วนสวนสาธารณะไม่ได้อยู่ในช่วงนี้ (สูงสุด ${f1(Math.max(...D.map(d=>d.ps)))}) และบทความไม่อธิบายวิธีคิด</li></ul></section>
+ <section><h3>อ่านอย่างระวัง</h3><ul>
+  <li>เป็นคะแนนเทียบกันระหว่างเขต ไม่ใช่เกรดสิ่งแวดล้อมจริง เขตอันดับ 1 ก็ไม่ได้แปลว่าสะอาดสมบูรณ์</li>
+  <li>เขตที่สุดขั้วเขตเดียวทำให้คะแนนของเขตอื่นถูกอัดกัน เช่น ขยะของปทุมวันได้ 1.0 ขณะที่อีก 49 เขตอยู่ในช่วง 26–50</li>
+  <li>ปีของข้อมูลไม่เท่ากัน น้ำเสียเป็นค่าเฉลี่ยตั้งแต่ปี 2540 ส่วนขยะและสวนเป็นปี 2568</li>
+  <li>คะแนนน้ำเสียของเขตถูกคิดจากค่า BOD ของคลองและแม่น้ำ ซึ่งไม่ได้อยู่ในเขตเดียว บทความไม่อธิบายวิธีแปลงเป็นรายเขต</li></ul></section>
+ <section><h3>เรื่องที่ตารางนี้ยืนยันไม่ได้</h3><ul>
+  <li>ทิศทางของน้ำเสียยืนยันได้จากค่า BOD ในบทความ (BOD ต่ำได้คะแนนสูง) ส่วนขยะและอากาศ บทความไม่เขียนทิศทางไว้ชัด หน้านี้อ่านตามเจตนาของดัชนีว่าค่าน้อยคือดี</li>
+  <li>ตารางไม่มีค่าดิบ จึงบอกไม่ได้ว่าขยะกี่กิโลกรัมหรือ PM2.5 กี่หน่วย</li>
+  <li>ตารางไม่แยกว่าส่วนไหนมาจากคนในเขต คนเข้ามาทำงาน หรือหน่วยงาน</li></ul></section>`;
+ 
+renderTabs(); render();
+document.getElementById('list').scrollTop = 0;
+</script>
+</body>
+</html>
+ 
